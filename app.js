@@ -52,7 +52,7 @@ function agg(list) {
 }
 
 // ─────────────────────────── 뷰 전환 ───────────────────────────
-const VIEWS = ['viewHome', 'viewCapture', 'viewConfirm', 'viewReport'];
+const VIEWS = ['viewHome', 'viewCapture', 'viewConfirm', 'viewReport', 'viewAdmin'];
 function show(view) {
   VIEWS.forEach(v => { $(v).hidden = v !== view; });
   $('footCapture').hidden = view !== 'viewCapture';
@@ -327,6 +327,40 @@ async function refreshNotif() {
   }
 }
 
+// ─────────────────────────── 관리자 대시보드 ───────────────────────────
+function showAdminGate(msg) {
+  $('admGate').hidden = false; $('admBoard').hidden = true;
+  $('admGateMsg').textContent = msg || ''; $('admSecret').value = '';
+}
+async function openAdmin() {
+  show('viewAdmin');
+  if (!window.Push || !Push.configured()) { showAdminGate('서버 배포 후 사용할 수 있습니다.'); $('admSecret').disabled = true; return; }
+  $('admSecret').disabled = false;
+  const secret = localStorage.getItem('ontrack.adminSecret');
+  if (secret && await loadAdminStats(secret)) { $('admGate').hidden = true; $('admBoard').hidden = false; return; }
+  showAdminGate('');
+}
+async function loadAdminStats(secret) {
+  try {
+    const s = await Push.adminStats(secret);
+    $('stSubs').textContent = s.subscriptions;
+    $('stPending').textContent = s.reminders.pending;
+    $('stBc').textContent = s.broadcasts.total;
+    renderAdminHistory(s.broadcasts.recent);
+    return true;
+  } catch (_) { return false; }
+}
+function renderAdminHistory(list) {
+  const box = $('admHistory');
+  if (!list || !list.length) { box.className = ''; box.innerHTML = '<div class="empty" style="padding:18px">아직 발송한 공지가 없습니다.</div>'; return; }
+  box.className = 'card';
+  box.innerHTML = list.map(b => `<div class="bc-row">
+    <div class="bt">${esc(b.title)}</div>
+    ${b.body ? `<div class="bb">${esc(b.body)}</div>` : ''}
+    <div class="bm">${esc(new Date(b.created_at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }))} · ${b.sent}/${b.total} 도달${b.failed ? ` · 실패 ${b.failed}` : ''}</div>
+  </div>`).join('');
+}
+
 function settingsModal() {
   const evs = state.events.map(e => {
     const meta = [e.country, e.startDate ? fmtDate(e.startDate) : ''].filter(Boolean).join(' · ');
@@ -355,34 +389,11 @@ function settingsModal() {
     </div>
     <button class="icon-btn" id="sReset" style="display:block;width:100%;text-align:center;color:var(--hot);margin-top:14px;font-size:13px">전체 데이터 삭제</button>
     <div style="border-top:1px solid var(--hairline);margin-top:16px;padding-top:12px">
-      <button class="icon-btn" id="adminToggle" style="width:100%;text-align:center;color:var(--ink-3);font-size:12px">관리자 공지 발송 ▾</button>
-      <div id="adminBox" hidden style="margin-top:10px">
-        <input class="input" id="bTitle" placeholder="공지 제목" style="margin-bottom:8px">
-        <textarea class="textarea" id="bBody" placeholder="공지 내용" style="min-height:60px;margin-bottom:8px"></textarea>
-        <input class="input" id="bSecret" type="password" placeholder="관리자 비밀번호" value="${esc(localStorage.getItem('ontrack.adminSecret') || '')}" style="margin-bottom:8px">
-        <button class="btn primary" id="bSend" style="width:100%">전체 기기에 발송</button>
-        <div class="opt" id="bResult" style="margin-top:8px;text-align:center;color:var(--ink-3)"></div>
-      </div>
+      <button class="icon-btn" id="sAdmin" style="width:100%;text-align:center;color:var(--ink-3);font-size:13px">관리자 대시보드 →</button>
     </div>
   `);
   refreshNotif();
-  $('adminToggle').onclick = () => {
-    const box = $('adminBox'); box.hidden = !box.hidden;
-    $('adminToggle').textContent = '관리자 공지 발송 ' + (box.hidden ? '▾' : '▴');
-  };
-  $('bSend').onclick = async () => {
-    const title = $('bTitle').value.trim(), body = $('bBody').value.trim(), secret = $('bSecret').value.trim();
-    if (!title) { $('bResult').textContent = '제목을 입력하세요'; return; }
-    if (!window.Push || !Push.configured()) { $('bResult').textContent = '서버 배포 후 사용 가능합니다'; return; }
-    localStorage.setItem('ontrack.adminSecret', secret);
-    $('bResult').textContent = '발송 중…';
-    try {
-      const r = await Push.broadcast({ title, body, secret });
-      $('bResult').textContent = `${r.sent}개 기기에 발송됨${r.failed ? ` (실패 ${r.failed})` : ''}`;
-    } catch (e) {
-      $('bResult').textContent = /forbidden/.test(String(e.message)) ? '비밀번호가 틀렸습니다' : ('오류: ' + e.message);
-    }
-  };
+  $('sAdmin').onclick = () => { persistProfile(); closeModal(); openAdmin(); };
   const persistProfile = () => {
     state.profile.company = $('sCompany').value.trim() || '우리 회사';
     state.profile.traveler = $('sTraveler').value.trim();
@@ -493,6 +504,36 @@ function bind() {
   // 확인
   $('cfAgain').onclick = () => openCapture(null);
   $('cfHome').onclick = () => { renderHome(); show('viewHome'); };
+
+  // 관리자 대시보드
+  $('admBack').onclick = () => { renderHome(); show('viewHome'); };
+  $('admRefresh').onclick = () => { const s = localStorage.getItem('ontrack.adminSecret'); if (s) loadAdminStats(s); };
+  $('admUnlock').onclick = async () => {
+    const secret = $('admSecret').value.trim();
+    if (!secret) { $('admGateMsg').textContent = '비밀번호를 입력하세요'; return; }
+    $('admGateMsg').textContent = '확인 중…';
+    if (await loadAdminStats(secret)) {
+      localStorage.setItem('ontrack.adminSecret', secret);
+      $('admGate').hidden = true; $('admBoard').hidden = false;
+    } else { $('admGateMsg').textContent = '비밀번호가 틀렸습니다'; }
+  };
+  $('admSend').onclick = async () => {
+    const title = $('admTitle').value.trim(), body = $('admBody').value.trim();
+    const secret = localStorage.getItem('ontrack.adminSecret');
+    const msg = $('admSendMsg');
+    if (!title) { msg.style.color = 'var(--hot)'; msg.textContent = '제목을 입력하세요'; return; }
+    msg.style.color = 'var(--ink-3)'; msg.textContent = '발송 중…';
+    try {
+      const r = await Push.broadcast({ title, body, secret });
+      msg.style.color = 'var(--good-text)';
+      msg.textContent = `${r.sent}개 기기에 발송됨${r.failed ? ` (실패 ${r.failed})` : ''}`;
+      $('admTitle').value = ''; $('admBody').value = '';
+      loadAdminStats(secret);
+    } catch (e) {
+      msg.style.color = 'var(--hot)';
+      msg.textContent = /forbidden/.test(String(e.message)) ? '권한 오류(비밀번호 확인)' : ('오류: ' + e.message);
+    }
+  };
 
   // 보고서
   $('repBack').onclick = () => { renderHome(); show('viewHome'); };

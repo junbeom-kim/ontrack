@@ -150,6 +150,39 @@
     <div id="reportDoc"></div>
   </main>
 
+  <!-- ── 관리자 대시보드 ── -->
+  <main class="view" id="viewAdmin" hidden>
+    <div class="sheet-h">
+      <button class="icon-btn" id="admBack">‹ 홈</button>
+      <h2>관리자</h2>
+      <button class="icon-btn link" id="admRefresh">⟳ 새로고침</button>
+    </div>
+
+    <div id="admGate" hidden>
+      <p class="rep-intro">관리자 비밀번호를 입력하세요.</p>
+      <input class="input" id="admSecret" type="password" placeholder="관리자 비밀번호" style="margin-top:8px">
+      <button class="cta accent" id="admUnlock" style="margin-top:12px">확인</button>
+      <div class="opt" id="admGateMsg" style="margin-top:10px;text-align:center;color:var(--hot)"></div>
+    </div>
+
+    <div id="admBoard" hidden>
+      <div class="stat-row">
+        <div class="stat"><div class="sv" id="stSubs">–</div><div class="sk">구독 기기</div></div>
+        <div class="stat"><div class="sv" id="stPending">–</div><div class="sk">예약 대기</div></div>
+        <div class="stat"><div class="sv" id="stBc">–</div><div class="sk">보낸 공지</div></div>
+      </div>
+
+      <div class="list-h" style="margin-top:24px"><span>공지 발송</span></div>
+      <input class="input" id="admTitle" placeholder="공지 제목" style="margin-bottom:8px">
+      <textarea class="textarea" id="admBody" placeholder="공지 내용" style="min-height:70px"></textarea>
+      <button class="cta accent" id="admSend" style="margin-top:10px">🔔 전체 기기에 발송</button>
+      <div class="opt" id="admSendMsg" style="margin-top:10px;text-align:center"></div>
+
+      <div class="list-h" style="margin-top:26px"><span>최근 공지</span></div>
+      <div id="admHistory"></div>
+    </div>
+  </main>
+
   <!-- 하단 저장 바 (입력 화면 전용) -->
   <div class="footbar" id="footCapture" hidden>
     <div class="footbar-inner">

@@ -79,6 +79,10 @@
     async broadcast({ title, body, url, secret }) {
       return callFn('broadcast', { title, body, url }, { 'x-admin-secret': secret });
     },
+    // 관리자 대시보드 통계 (관리자 시크릿 필요)
+    async adminStats(secret) {
+      return callFn('admin-stats', {}, { 'x-admin-secret': secret });
+    },
 
     // 테스트: 즉시 로컬 알림 + 20초 뒤 서버 푸시(잠금화면 확인용)
     async test() {

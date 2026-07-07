@@ -217,6 +217,15 @@ input, textarea, select { font-family: inherit; font-size: 16px; color: inherit;
 .evrow .e-nm { font-size: 14.5px; font-weight: 700; }
 .evrow .e-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
 .evrow .e-badge { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--accent-deep); }
+.stat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--hairline); border-radius: 14px; padding: 17px 10px; text-align: center; }
+.stat .sv { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.stat .sk { font-size: 11px; color: var(--ink-3); margin-top: 6px; }
+.bc-row { padding: 12px 2px; border-top: 1px solid var(--line); }
+.bc-row:first-child { border-top: 0; }
+.bc-row .bt { font-size: 14px; font-weight: 700; }
+.bc-row .bb { font-size: 12.5px; color: var(--ink-2); margin-top: 2px; line-height: 1.45; }
+.bc-row .bm { font-size: 11px; color: var(--ink-3); margin-top: 4px; }
 .notif-box { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; padding: 13px 14px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
 .notif-box .ni { display: block; }
 .notif-box .ni b { color: var(--ink); font-weight: 700; }
