@@ -1,0 +1,17 @@
+{
+  "name": "온트랙 · 현장 상담 기록",
+  "short_name": "온트랙",
+  "description": "해외전시 부스에서 상담을 30초 안에 기록하고, 오늘 성과를 즉시 확인하고, 출장 결과 보고서를 만듭니다.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f9f9f7",
+  "theme_color": "#2a78d6",
+  "lang": "ko",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

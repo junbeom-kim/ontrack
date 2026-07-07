@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>온트랙 · 현장 상담 기록</title>
+<meta name="theme-color" content="#2a78d6">
+<link rel="manifest" href="manifest.webmanifest">
+<!-- iOS 홈화면 설치 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="온트랙">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+
+  <!-- 상단 바 -->
+  <header class="topbar">
+    <button class="brand" id="openSettings" style="text-align:left">
+      <div class="co" id="tbCompany">우리 회사</div>
+      <div class="ev" id="tbEvent">전시회 선택 →</div>
+    </button>
+    <span class="sync local" id="syncBadge"><i></i><span id="syncText">로컬 저장</span></span>
+  </header>
+
+  <!-- ── 홈 뷰 ── -->
+  <main class="view" id="viewHome">
+    <div class="hero">
+      <div class="k" id="heroLabel">오늘 상담</div>
+      <div class="v" id="heroCount">0</div>
+      <div class="mini">
+        <span class="m"><b id="heroLeads">0</b> 유효리드</span>
+        <span class="m"><b id="heroDeals">0</b> 계약논의</span>
+      </div>
+    </div>
+
+    <button class="cta hot" id="btnAdd"><span class="plus">＋</span> 상담 기록</button>
+
+    <div class="list-h"><span>방금 기록</span><a id="btnReportLink">출장 보고서 →</a></div>
+    <div id="leadList"></div>
+  </main>
+
+  <!-- ── 입력 뷰 ── -->
+  <main class="view" id="viewCapture" hidden>
+    <div class="sheet-h">
+      <button class="icon-btn" id="capCancel">✕ 취소</button>
+      <h2 id="capTitle">새 상담</h2>
+      <span style="width:52px"></span>
+    </div>
+
+    <div class="field">
+      <div class="field-l">바이어 <span class="opt">— 나중에 보강 가능</span></div>
+      <div class="two-col">
+        <input class="input" id="fCompany" placeholder="회사명" autocomplete="off">
+        <input class="input" id="fName" placeholder="담당자(선택)" autocomplete="off">
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-l"><span>관심도</span><span class="opt">— 1개</span></div>
+      <div class="chips" id="fGrade">
+        <button class="chip grade hot" data-v="hot">🔥 유망</button>
+        <button class="chip grade warm" data-v="warm">관심</button>
+        <button class="chip grade cold" data-v="cold">참고</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-l"><span>상담 유형</span><span class="opt">— 복수</span></div>
+      <div class="chips" id="fTypes">
+        <button class="chip" data-v="기술협의">기술 협의</button>
+        <button class="chip" data-v="샘플요청">샘플 요청</button>
+        <button class="chip" data-v="견적요청">견적 요청</button>
+        <button class="chip" data-v="대리점문의">대리점 문의</button>
+        <button class="chip" data-v="MOU·계약">MOU·계약 논의</button>
+        <button class="chip" data-v="단순문의">단순 문의</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-l"><span>다음 액션</span><span class="opt">— 복수·선택</span></div>
+      <div class="chips" id="fActions">
+        <button class="chip" data-v="샘플발송">샘플 발송</button>
+        <button class="chip" data-v="견적발송">견적서 발송</button>
+        <button class="chip" data-v="재연락">재연락</button>
+        <button class="chip" data-v="자료발송">자료 발송</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-l"><span>예상 규모</span><span class="opt">— 선택</span></div>
+      <div class="chips" id="fScale">
+        <button class="chip" data-v="소">소</button>
+        <button class="chip" data-v="중">중</button>
+        <button class="chip" data-v="대">대</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <div class="field-l"><span>한 줄 메모</span><span class="opt">— 선택</span></div>
+      <textarea class="textarea" id="fMemo" placeholder="상대가 뭘 원했는지 / 합의 내용 등"></textarea>
+    </div>
+  </main>
+
+  <!-- ── 확인 뷰 ── -->
+  <main class="view" id="viewConfirm" hidden>
+    <div class="confirm">
+      <div class="check"><span>✓</span></div>
+      <h3 id="cfTitle">저장됨</h3>
+      <p class="sub" id="cfSub"></p>
+      <div class="perf-box">
+        <div class="pk">오늘 내 성과</div>
+        <div class="perf-3">
+          <div class="cell"><div class="v" id="cfCount">0</div><div class="k">상담</div></div>
+          <div class="cell"><div class="v hot" id="cfLeads">0</div><div class="k">유효리드</div></div>
+          <div class="cell"><div class="v" id="cfDeals">0</div><div class="k">계약논의</div></div>
+        </div>
+      </div>
+      <button class="cta hot" id="cfAgain"><span class="plus">＋</span> 저장하고 새 상담</button>
+      <button class="icon-btn link" id="cfHome" style="display:block;width:100%;padding:14px">홈으로</button>
+    </div>
+  </main>
+
+  <!-- ── 보고서 뷰 ── -->
+  <main class="view" id="viewReport" hidden>
+    <div class="sheet-h">
+      <button class="icon-btn" id="repBack">‹ 홈</button>
+      <h2>출장 보고서</h2>
+      <span style="width:40px"></span>
+    </div>
+    <p class="rep-intro">기록된 상담에서 자동 조립됩니다. 총평만 채우고 <b>PDF로 내보내기</b>를 누르세요.</p>
+    <div class="field" style="margin-top:14px">
+      <div class="field-l">총평 · 시사점</div>
+      <textarea class="textarea" id="rNarrative" style="min-height:90px" placeholder="이번 전시 성과 요약과 후속 계획을 적으세요. (보고서에 그대로 실립니다)"></textarea>
+    </div>
+    <div id="reportDoc"></div>
+  </main>
+
+  <!-- 하단 저장 바 (입력 화면 전용) -->
+  <div class="footbar" id="footCapture" hidden>
+    <div class="footbar-inner">
+      <button class="cta accent" id="btnSave">저장</button>
+      <div class="tap-count" id="tapCount">등급·유형만 골라도 저장됩니다</div>
+    </div>
+  </div>
+  <!-- 하단 내보내기 바 (보고서 전용) -->
+  <div class="footbar" id="footReport" hidden>
+    <div class="footbar-inner">
+      <button class="cta accent" id="btnExport">📄 PDF로 내보내기</button>
+    </div>
+  </div>
+
+  <!-- 설정/이벤트 모달 -->
+  <div class="modal-bg" id="modalBg" hidden>
+    <div class="modal" id="modal"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
