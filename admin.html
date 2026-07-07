@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>온트랙 관리자</title>
+<meta name="robots" content="noindex, nofollow">
+<style>
+  :root {
+    --plane:#f5f5f2; --surface:#ffffff; --ink:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+    --line:#e6e5df; --hairline:rgba(11,11,11,.09);
+    --accent:#2a78d6; --accent-deep:#1c5cab; --accent-wash:rgba(42,120,214,.08);
+    --good:#0ca30c; --good-text:#087a08; --hot:#eb6834; --warn:#c98a12;
+    --shadow:0 1px 2px rgba(11,11,11,.05), 0 12px 34px rgba(11,11,11,.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --plane:#0c0c0c; --surface:#171716; --ink:#fff; --ink-2:#c3c2b7; --ink-3:#8a8880;
+      --line:#2a2a28; --hairline:rgba(255,255,255,.09);
+      --accent:#3987e5; --accent-deep:#86b6ef; --accent-wash:rgba(57,135,229,.14);
+      --good:#0ca30c; --good-text:#35c635; --hot:#d95926; --warn:#fab219;
+      --shadow:0 1px 2px rgba(0,0,0,.45), 0 12px 34px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--plane); color:var(--ink);
+    font-family:-apple-system,"Apple SD Gothic Neo","Pretendard","Noto Sans KR","Segoe UI",system-ui,sans-serif;
+    font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  button { font-family:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+  input, textarea { font-family:inherit; font-size:15px; color:inherit; }
+  .wrap { max-width:1000px; margin:0 auto; padding:32px 24px 80px; }
+
+  /* header */
+  header { display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:24px; }
+  .brand { display:flex; align-items:center; gap:11px; }
+  .logo { width:34px; height:34px; border-radius:9px; background:var(--accent); position:relative; flex:0 0 auto; }
+  .logo::before { content:""; position:absolute; inset:8px; border:3px solid #fff; border-radius:50%; }
+  .logo::after { content:""; position:absolute; width:9px; height:9px; border-radius:50%; background:#fff; top:12.5px; left:12.5px; }
+  h1 { font-size:19px; font-weight:800; margin:0; letter-spacing:-.01em; }
+  .sub { font-size:12px; color:var(--ink-3); }
+  .hactions { display:flex; align-items:center; gap:10px; }
+  .updated { font-size:12px; color:var(--ink-3); }
+  .btn { font-size:13.5px; font-weight:700; padding:9px 14px; border-radius:10px; border:1px solid var(--line); background:var(--surface); color:var(--ink-2); }
+  .btn:hover { border-color:var(--accent); color:var(--accent-deep); }
+  .btn.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .btn.primary:hover { background:var(--accent-deep); color:#fff; }
+  .btn:disabled { opacity:.5; cursor:default; }
+
+  /* stat cards */
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:14px; margin-bottom:22px; }
+  .card { background:var(--surface); border:1px solid var(--hairline); border-radius:16px; box-shadow:var(--shadow); }
+  .stat { padding:20px 18px; }
+  .stat .v { font-size:38px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; }
+  .stat .k { font-size:12.5px; color:var(--ink-3); margin-top:8px; }
+  .stat .v.accent { color:var(--accent-deep); }
+
+  /* two-col grid */
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+  @media (max-width:760px){ .grid { grid-template-columns:1fr; } }
+  .panel { padding:20px; }
+  .panel h2 { font-size:14px; font-weight:800; letter-spacing:.02em; margin:0 0 14px; display:flex; align-items:center; justify-content:space-between; }
+  .panel h2 .cnt { font-size:12px; font-weight:700; color:var(--ink-3); }
+
+  label { display:block; font-size:12px; font-weight:700; color:var(--ink-2); margin:0 0 6px; }
+  .field { margin-bottom:14px; }
+  input.f, textarea.f { width:100%; background:var(--plane); border:1.5px solid var(--line); border-radius:10px; padding:11px 13px; outline:none; }
+  input.f:focus, textarea.f:focus { border-color:var(--accent); }
+  textarea.f { resize:vertical; min-height:80px; line-height:1.5; }
+  .send-msg { font-size:13px; margin-top:10px; min-height:18px; }
+
+  /* lists */
+  .row { padding:12px 0; border-top:1px solid var(--line); }
+  .row:first-child { border-top:0; }
+  .row .t { font-size:14px; font-weight:700; }
+  .row .b { font-size:13px; color:var(--ink-2); margin-top:2px; line-height:1.45; }
+  .row .m { font-size:12px; color:var(--ink-3); margin-top:4px; display:flex; gap:8px; align-items:center; }
+  .pill { font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--accent-wash); color:var(--accent-deep); }
+  .pill.warn { background:rgba(201,138,18,.12); color:var(--warn); }
+  .dev { display:flex; align-items:center; gap:10px; padding:11px 0; border-top:1px solid var(--line); }
+  .dev:first-child { border-top:0; }
+  .dev .ico { font-size:18px; width:26px; text-align:center; flex:0 0 auto; }
+  .dev .dn { font-size:13.5px; font-weight:600; }
+  .dev .dt { font-size:11.5px; color:var(--ink-3); margin-left:auto; white-space:nowrap; }
+  .empty { color:var(--ink-3); font-size:13px; padding:16px 2px; text-align:center; }
+
+  /* gate */
+  .gate { position:fixed; inset:0; background:var(--plane); display:grid; place-items:center; padding:24px; z-index:10; }
+  .gate .box { width:100%; max-width:360px; text-align:center; }
+  .gate .logo { margin:0 auto 16px; width:48px; height:48px; border-radius:12px; }
+  .gate .logo::before { inset:11px; }
+  .gate .logo::after { width:12px; height:12px; top:17px; left:17px; }
+  .gate h1 { font-size:20px; margin-bottom:6px; }
+  .gate p { font-size:13px; color:var(--ink-3); margin:0 0 20px; }
+  .gate input { width:100%; text-align:center; padding:13px; font-size:16px; margin-bottom:12px; background:var(--surface); border:1.5px solid var(--line); border-radius:11px; outline:none; }
+  .gate input:focus { border-color:var(--accent); }
+  .gate .msg { font-size:13px; color:var(--hot); min-height:18px; margin-top:10px; }
+  .hidden { display:none !important; }
+
+  .toast { position:fixed; bottom:26px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--plane); font-size:13.5px; font-weight:700; padding:12px 20px; border-radius:99px; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:20; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(-4px); }
+</style>
+</head>
+<body>
+
+<!-- 비밀번호 게이트 -->
+<div class="gate" id="gate">
+  <div class="box">
+    <div class="logo"></div>
+    <h1>온트랙 관리자</h1>
+    <p>브레인파크 관리자 전용입니다.</p>
+    <input id="gSecret" type="password" placeholder="관리자 비밀번호" autocomplete="current-password">
+    <button class="btn primary" id="gEnter" style="width:100%;padding:13px">들어가기</button>
+    <div class="msg" id="gMsg"></div>
+  </div>
+</div>
+
+<!-- 대시보드 -->
+<div class="wrap hidden" id="app">
+  <header>
+    <div class="brand">
+      <div class="logo"></div>
+      <div>
+        <h1>온트랙 관리자</h1>
+        <div class="sub">해외전시 현장 상담 기록 · 알림 운영</div>
+      </div>
+    </div>
+    <div class="hactions">
+      <span class="updated" id="updated"></span>
+      <button class="btn" id="refresh">⟳ 새로고침</button>
+      <button class="btn" id="logout">로그아웃</button>
+    </div>
+  </header>
+
+  <div class="stats">
+    <div class="card stat"><div class="v accent" id="stSubs">–</div><div class="k">구독 기기</div></div>
+    <div class="card stat"><div class="v" id="stPending">–</div><div class="k">예약 대기(재연락)</div></div>
+    <div class="card stat"><div class="v" id="stSent">–</div><div class="k">발송된 리마인더</div></div>
+    <div class="card stat"><div class="v" id="stBc">–</div><div class="k">보낸 공지</div></div>
+  </div>
+
+  <div class="grid">
+    <div>
+      <div class="card panel">
+        <h2>공지 발송</h2>
+        <div class="field"><label>제목</label><input class="f" id="bTitle" placeholder="예: 부스 철수 30분 전 안내"></div>
+        <div class="field"><label>내용</label><textarea class="f" id="bBody" placeholder="알림에 표시될 내용"></textarea></div>
+        <button class="btn primary" id="bSend" style="width:100%;padding:13px">🔔 전체 기기에 발송</button>
+        <div class="send-msg" id="bMsg"></div>
+      </div>
+
+      <div class="card panel" style="margin-top:18px">
+        <h2>최근 공지 <span class="cnt" id="bcCnt"></span></h2>
+        <div id="history"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="card panel">
+        <h2>구독 기기 <span class="cnt" id="devCnt"></span></h2>
+        <div id="devices"></div>
+      </div>
+
+      <div class="card panel" style="margin-top:18px">
+        <h2>예정된 재연락 <span class="cnt" id="upCnt"></span></h2>
+        <div id="upcoming"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+'use strict';
+const CFG = window.ONTRACK_CONFIG || {};
+const fnUrl = (n) => `${(CFG.SUPABASE_URL||'').replace(/\/$/,'')}/functions/v1/${n}`;
+const SKEY = 'ontrack.admin.secret';
+const $ = (id) => document.getElementById(id);
+let timer = null;
+
+async function callFn(name, body, secret) {
+  const headers = { 'Content-Type':'application/json', 'x-admin-secret': secret };
+  if (CFG.SUPABASE_ANON) { headers['apikey']=CFG.SUPABASE_ANON; headers['Authorization']='Bearer '+CFG.SUPABASE_ANON; }
+  const res = await fetch(fnUrl(name), { method:'POST', headers, body:JSON.stringify(body||{}) });
+  let data={}; try { data=await res.json(); } catch(_){}
+  if (!res.ok) { const e=new Error(data.error||('HTTP '+res.status)); e.status=res.status; throw e; }
+  return data;
+}
+
+const esc = (s) => (s||'').replace(/[&<>"]/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+function relTime(iso){
+  const s=Math.floor((Date.now()-new Date(iso).getTime())/1000);
+  if(s<60)return '방금'; if(s<3600)return Math.floor(s/60)+'분 전'; if(s<86400)return Math.floor(s/3600)+'시간 전';
+  const d=new Date(iso); return `${d.getMonth()+1}/${d.getDate()}`;
+}
+function fmtWhen(iso){
+  const d=new Date(iso); const wd=['일','월','화','수','목','금','토'][d.getDay()];
+  return `${d.getMonth()+1}/${d.getDate()}(${wd}) ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function deviceName(ua){
+  ua=ua||'';
+  let os='기기', ico='📱';
+  if(/iPhone/.test(ua)){os='iPhone';ico='📱';} else if(/iPad/.test(ua)){os='iPad';ico='📱';}
+  else if(/Android/.test(ua)){os='Android';ico='📱';} else if(/Macintosh|Mac OS/.test(ua)){os='Mac';ico='💻';}
+  else if(/Windows/.test(ua)){os='Windows';ico='💻';} else {ico='🖥️';}
+  const m=ua.match(/OS (\d+[_\d]*)/); if(m&&/iPhone|iPad/.test(ua)) os+=' '+m[1].replace(/_/g,'.');
+  return {os,ico};
+}
+
+function render(s){
+  $('stSubs').textContent=s.subscriptions;
+  $('stPending').textContent=s.reminders.pending;
+  $('stSent').textContent=s.reminders.sent;
+  $('stBc').textContent=s.broadcasts.total;
+
+  const hist=s.broadcasts.recent||[];
+  $('bcCnt').textContent=hist.length?`${hist.length}건`:'';
+  $('history').innerHTML = hist.length ? hist.map(b=>`<div class="row">
+    <div class="t">${esc(b.title)}</div>
+    ${b.body?`<div class="b">${esc(b.body)}</div>`:''}
+    <div class="m"><span class="pill">${b.sent}/${b.total} 도달</span>${b.failed?`<span class="pill warn">실패 ${b.failed}</span>`:''}<span>${esc(fmtWhen(b.created_at))}</span></div>
+  </div>`).join('') : '<div class="empty">아직 발송한 공지가 없습니다.</div>';
+
+  const devs=s.devices||[];
+  $('devCnt').textContent=devs.length?`${devs.length}대`:'';
+  $('devices').innerHTML = devs.length ? devs.map(d=>{const n=deviceName(d.ua);return `<div class="dev">
+    <span class="ico">${n.ico}</span><span class="dn">${esc(n.os)}</span><span class="dt">${esc(relTime(d.created_at))} 등록</span>
+  </div>`;}).join('') : '<div class="empty">아직 알림을 켠 기기가 없습니다.</div>';
+
+  const up=s.upcoming||[];
+  $('upCnt').textContent=up.length?`${up.length}건`:'';
+  $('upcoming').innerHTML = up.length ? up.map(r=>`<div class="row">
+    <div class="t">${esc(r.title)}</div>
+    <div class="m"><span class="pill">${esc(fmtWhen(r.fire_at))}</span></div>
+  </div>`).join('') : '<div class="empty">예정된 재연락 알림이 없습니다.</div>';
+
+  $('updated').textContent='업데이트 '+new Date(s.generatedAt).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+async function load(){
+  const secret=localStorage.getItem(SKEY); if(!secret) return false;
+  try { render(await callFn('admin-stats',{},secret)); return true; }
+  catch(e){ if(e.status===403){ logout(); } return false; }
+}
+
+function enterApp(){ $('gate').classList.add('hidden'); $('app').classList.remove('hidden'); load(); if(timer)clearInterval(timer); timer=setInterval(load,30000); }
+function logout(){ localStorage.removeItem(SKEY); if(timer)clearInterval(timer); $('app').classList.add('hidden'); $('gate').classList.remove('hidden'); $('gSecret').value=''; $('gMsg').textContent=''; }
+
+let toastT;
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2400); }
+
+// 게이트 진입
+async function tryEnter(){
+  const secret=$('gSecret').value.trim(); if(!secret){ $('gMsg').textContent='비밀번호를 입력하세요'; return; }
+  if(!CFG.SUPABASE_URL){ $('gMsg').textContent='서버 설정이 없습니다'; return; }
+  $('gMsg').textContent='확인 중…'; $('gEnter').disabled=true;
+  try { await callFn('admin-stats',{},secret); localStorage.setItem(SKEY,secret); enterApp(); }
+  catch(e){ $('gMsg').textContent = e.status===403 ? '비밀번호가 틀렸습니다' : ('오류: '+e.message); }
+  finally { $('gEnter').disabled=false; }
+}
+$('gEnter').onclick=tryEnter;
+$('gSecret').addEventListener('keydown',e=>{ if(e.key==='Enter') tryEnter(); });
+$('refresh').onclick=()=>{ load(); };
+$('logout').onclick=logout;
+$('bSend').onclick=async()=>{
+  const title=$('bTitle').value.trim(), body=$('bBody').value.trim(), secret=localStorage.getItem(SKEY);
+  const msg=$('bMsg');
+  if(!title){ msg.style.color='var(--hot)'; msg.textContent='제목을 입력하세요'; return; }
+  if(!confirm(`전체 구독 기기에 공지를 발송합니다.\n\n제목: ${title}\n\n계속할까요?`)) return;
+  msg.style.color='var(--ink-3)'; msg.textContent='발송 중…'; $('bSend').disabled=true;
+  try {
+    const r=await callFn('broadcast',{title,body},secret);
+    msg.style.color='var(--good-text)'; msg.textContent=`${r.sent}대에 발송됨${r.failed?` (실패 ${r.failed})`:''}`;
+    $('bTitle').value=''; $('bBody').value=''; toast('공지를 발송했습니다'); load();
+  } catch(e){ msg.style.color='var(--hot)'; msg.textContent = e.status===403?'권한 오류(로그아웃 후 재로그인)':('오류: '+e.message); }
+  finally { $('bSend').disabled=false; }
+}
+
+// 저장된 세션 있으면 자동 진입
+if(localStorage.getItem(SKEY)) enterApp();
+</script>
+</body>
+</html>
