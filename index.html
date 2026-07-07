@@ -99,6 +99,18 @@
     </div>
 
     <div class="field">
+      <div class="field-l"><span>재연락 알림</span><span class="opt">— 선택 · 그날 오전 9시 푸시</span></div>
+      <div class="chips" id="fFollowupQuick">
+        <button class="chip" data-v="0">없음</button>
+        <button class="chip" data-v="1">내일</button>
+        <button class="chip" data-v="3">3일 뒤</button>
+        <button class="chip" data-v="7">1주 뒤</button>
+      </div>
+      <input class="input" id="fFollowupDate" type="date" style="margin-top:8px">
+      <div class="opt" id="fFollowupHint" style="margin-top:7px;color:var(--ink-3);line-height:1.5"></div>
+    </div>
+
+    <div class="field">
       <div class="field-l"><span>한 줄 메모</span><span class="opt">— 선택</span></div>
       <textarea class="textarea" id="fMemo" placeholder="상대가 뭘 원했는지 / 합의 내용 등"></textarea>
     </div>
@@ -160,6 +172,8 @@
   <div class="toast" id="toast"></div>
 </div>
 
+<script src="config.js"></script>
+<script src="push.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

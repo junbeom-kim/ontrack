@@ -112,7 +112,7 @@ const esc = (s) => (s || '').replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;
 
 // ─────────────────────────── 입력(캡처) ───────────────────────────
 let editingId = null;
-const draft = { grade: null, types: [], nextActions: [], scale: null };
+const draft = { grade: null, types: [], nextActions: [], scale: null, followUpDate: null };
 
 function chipGroup(containerId, mode, getVal, setVal) {
   $(containerId).addEventListener('click', (e) => {
@@ -144,15 +144,45 @@ function openCapture(id = null) {
   draft.types = c ? [...(c.types || [])] : [];
   draft.nextActions = c ? [...(c.nextActions || [])] : [];
   draft.scale = c ? (c.scale || null) : null;
+  draft.followUpDate = c ? (c.followUpDate || null) : null;
   $('fCompany').value = c ? (c.buyerCompany || '') : '';
   $('fName').value = c ? (c.buyerName || '') : '';
   $('fMemo').value = c ? (c.memo || '') : '';
+  $('fFollowupDate').value = draft.followUpDate || '';
   $('capTitle').textContent = c ? '상담 보강' : '새 상담';
   syncChips('fGrade', 'single', draft.grade);
   syncChips('fTypes', 'multi', draft.types);
   syncChips('fActions', 'multi', draft.nextActions);
   syncChips('fScale', 'single', draft.scale);
+  updateFollowupUI();
   show('viewCapture');
+}
+
+// 재연락 알림: 빠른칩(내일/3일/1주)·날짜입력 → draft.followUpDate(YYYY-MM-DD)
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function daysFromToday(dateStr) {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + 'T00:00:00');
+  return Math.round((d - t) / 86400000);
+}
+function updateFollowupUI() {
+  const v = draft.followUpDate;
+  $('fFollowupQuick').querySelectorAll('.chip').forEach(chip => {
+    const n = +chip.dataset.v;
+    const on = v ? daysFromToday(v) === n && n !== 0 : n === 0;
+    chip.classList.toggle('sel', on);
+  });
+  const hint = $('fFollowupHint');
+  if (!v) { hint.textContent = ''; return; }
+  const d = new Date(v + 'T09:00:00');
+  const wd = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+  let msg = `${d.getMonth() + 1}월 ${d.getDate()}일(${wd}) 오전 9시에 재연락 알림`;
+  if (window.Push && Push.configured()) {
+    Push.isOn().then(on => { $('fFollowupHint').textContent = msg + (on ? '' : ' · 설정에서 알림을 켜야 실제 발송됩니다'); });
+  } else {
+    msg += ' · (서버 배포 후 발송)';
+  }
+  hint.textContent = msg;
 }
 
 function saveConsultation() {
@@ -169,15 +199,19 @@ function saveConsultation() {
     nextActions: [...draft.nextActions],
     scale: draft.scale,
     memo: $('fMemo').value.trim(),
+    followUpDate: draft.followUpDate || null,
   };
   if (editingId) {
     const c = state.consultations.find(x => x.id === editingId);
+    const prevRem = c.reminderId;
     Object.assign(c, base);
-    save(); toast('보강 저장됨'); renderHome(); show('viewHome'); return;
+    save(); syncReminder(c, prevRem);
+    toast('보강 저장됨'); renderHome(); show('viewHome'); return;
   }
   const c = { id: uid(), createdAt: Date.now(), ...base };
   state.consultations.push(c);
   save();
+  syncReminder(c, null);
   // 확인 화면
   const today = agg(eventCons().filter(x => isToday(x.createdAt)));
   const n = eventCons().filter(x => isToday(x.createdAt)).length;
@@ -187,6 +221,23 @@ function saveConsultation() {
   $('cfLeads').textContent = today.leads;
   $('cfDeals').textContent = today.deals;
   show('viewConfirm');
+}
+
+// 상담의 재연락 날짜를 서버 예약과 동기화(로컬 저장을 절대 막지 않음, 베스트에포트)
+async function syncReminder(c, prevReminderId) {
+  if (!window.Push || !Push.configured()) return; // 서버 미배포 시: 로컬에 followUpDate만 보관
+  try {
+    if (!c.followUpDate) {
+      if (prevReminderId) { await Push.cancel(prevReminderId); c.reminderId = null; save(); }
+      return;
+    }
+    if (!(await Push.isOn())) return; // 알림 미허용 시 서버 예약 생략(다음에 켜고 저장하면 등록)
+    const fireAt = new Date(c.followUpDate + 'T09:00:00').toISOString();
+    const title = '재연락: ' + (c.buyerCompany || '바이어');
+    const body = [GRADE_LABEL[c.grade] || '', (c.types || []).join(', ')].filter(Boolean).join(' · ');
+    const id = await Push.schedule({ id: prevReminderId || undefined, title, body, url: './', fireAt });
+    c.reminderId = id; save();
+  } catch (_) { /* 오프라인 등: 조용히 무시 */ }
 }
 
 // ─────────────────────────── 보고서 ───────────────────────────
@@ -244,6 +295,38 @@ function buildReportDoc() {
 function openModal(html) { $('modal').innerHTML = html; $('modalBg').hidden = false; }
 function closeModal() { $('modalBg').hidden = true; }
 
+// 알림 상태 박스: 상황별 안내/버튼
+async function refreshNotif() {
+  const box = $('notifBox'); if (!box) return;
+  const P = window.Push;
+  const info = (t) => { box.className = 'notif-box'; box.innerHTML = `<span class="ni">${t}</span>`; };
+  const withBtn = (t, label, cls, fn) => {
+    box.className = 'notif-box';
+    box.innerHTML = `<span class="ni">${t}</span><button class="btn ${cls}" style="margin-top:10px;width:100%">${label}</button>`;
+    box.querySelector('button').onclick = fn;
+  };
+  if (!P || !P.supported()) return info('이 브라우저는 웹 푸시를 지원하지 않습니다.');
+  if (!P.configured()) return info('⏳ 푸시 서버 배포 후 사용할 수 있습니다. (재연락 날짜는 지금도 기록됩니다)');
+  if (P.isIOS() && !P.standalone()) return info('📲 홈 화면에 추가한 <b>온트랙 앱</b>에서 열어야 알림을 켤 수 있어요. (Safari 공유 → 홈 화면에 추가)');
+  if (P.permission() === 'denied') return info('🔕 알림이 차단돼 있습니다. iPhone 설정 → 온트랙 → 알림에서 허용해주세요.');
+  if (await P.isOn()) {
+    withBtn('🔔 알림 켜짐. 재연락 날짜를 잡으면 그날 오전 9시에 푸시가 옵니다.', '테스트 알림 받기', 'ghost', async (e) => {
+      e.target.disabled = true; e.target.textContent = '보냄 ✓';
+      try { await P.test(); toast('테스트 알림을 예약했습니다 (20초 뒤 잠금화면 확인)'); } catch (_) { toast('테스트 실패'); }
+    });
+  } else {
+    withBtn('재연락 리마인더를 받으려면 알림을 켜세요.', '🔔 알림 켜기', 'primary', async (e) => {
+      e.target.disabled = true; e.target.textContent = '설정 중…';
+      const r = await P.enable();
+      if (r.ok) { toast('알림이 켜졌습니다'); refreshNotif(); }
+      else {
+        const m = { need_install: '홈 화면에 추가한 앱에서 열어주세요', denied: '알림 권한이 거부됐습니다', unsupported: '미지원 브라우저', not_configured: '서버 배포 후 가능' };
+        toast(m[r.reason] || '알림을 켜지 못했습니다'); refreshNotif();
+      }
+    });
+  }
+}
+
 function settingsModal() {
   const evs = state.events.map(e => {
     const meta = [e.country, e.startDate ? fmtDate(e.startDate) : ''].filter(Boolean).join(' · ');
@@ -259,6 +342,10 @@ function settingsModal() {
     <input class="input" id="sCompany" value="${esc(state.profile.company)}" placeholder="회사명">
     <label>출장자</label>
     <input class="input" id="sTraveler" value="${esc(state.profile.traveler)}" placeholder="담당자 이름">
+
+    <label style="margin-top:20px">알림 (재연락 리마인더)</label>
+    <div id="notifBox" class="notif-box">확인 중…</div>
+
     <label style="margin-top:20px">전시회</label>
     <div class="evlist">${evs}</div>
     <button class="btn ghost" id="sAddEvent" style="width:100%;margin-top:4px">＋ 전시회 추가</button>
@@ -267,7 +354,35 @@ function settingsModal() {
       <button class="btn primary" id="sSave">저장</button>
     </div>
     <button class="icon-btn" id="sReset" style="display:block;width:100%;text-align:center;color:var(--hot);margin-top:14px;font-size:13px">전체 데이터 삭제</button>
+    <div style="border-top:1px solid var(--hairline);margin-top:16px;padding-top:12px">
+      <button class="icon-btn" id="adminToggle" style="width:100%;text-align:center;color:var(--ink-3);font-size:12px">관리자 공지 발송 ▾</button>
+      <div id="adminBox" hidden style="margin-top:10px">
+        <input class="input" id="bTitle" placeholder="공지 제목" style="margin-bottom:8px">
+        <textarea class="textarea" id="bBody" placeholder="공지 내용" style="min-height:60px;margin-bottom:8px"></textarea>
+        <input class="input" id="bSecret" type="password" placeholder="관리자 비밀번호" value="${esc(localStorage.getItem('ontrack.adminSecret') || '')}" style="margin-bottom:8px">
+        <button class="btn primary" id="bSend" style="width:100%">전체 기기에 발송</button>
+        <div class="opt" id="bResult" style="margin-top:8px;text-align:center;color:var(--ink-3)"></div>
+      </div>
+    </div>
   `);
+  refreshNotif();
+  $('adminToggle').onclick = () => {
+    const box = $('adminBox'); box.hidden = !box.hidden;
+    $('adminToggle').textContent = '관리자 공지 발송 ' + (box.hidden ? '▾' : '▴');
+  };
+  $('bSend').onclick = async () => {
+    const title = $('bTitle').value.trim(), body = $('bBody').value.trim(), secret = $('bSecret').value.trim();
+    if (!title) { $('bResult').textContent = '제목을 입력하세요'; return; }
+    if (!window.Push || !Push.configured()) { $('bResult').textContent = '서버 배포 후 사용 가능합니다'; return; }
+    localStorage.setItem('ontrack.adminSecret', secret);
+    $('bResult').textContent = '발송 중…';
+    try {
+      const r = await Push.broadcast({ title, body, secret });
+      $('bResult').textContent = `${r.sent}개 기기에 발송됨${r.failed ? ` (실패 ${r.failed})` : ''}`;
+    } catch (e) {
+      $('bResult').textContent = /forbidden/.test(String(e.message)) ? '비밀번호가 틀렸습니다' : ('오류: ' + e.message);
+    }
+  };
   const persistProfile = () => {
     state.profile.company = $('sCompany').value.trim() || '우리 회사';
     state.profile.traveler = $('sTraveler').value.trim();
@@ -361,6 +476,17 @@ function bind() {
   chipGroup('fTypes', 'multi', () => draft.types, v => draft.types = v);
   chipGroup('fActions', 'multi', () => draft.nextActions, v => draft.nextActions = v);
   chipGroup('fScale', 'single', () => draft.scale, v => draft.scale = v);
+  // 재연락 알림: 빠른 칩 → 날짜 계산
+  $('fFollowupQuick').addEventListener('click', (e) => {
+    const chip = e.target.closest('.chip'); if (!chip) return;
+    const n = +chip.dataset.v;
+    if (n === 0) { draft.followUpDate = null; $('fFollowupDate').value = ''; }
+    else { const d = new Date(); d.setDate(d.getDate() + n); draft.followUpDate = ymd(d); $('fFollowupDate').value = draft.followUpDate; }
+    updateFollowupUI();
+  });
+  $('fFollowupDate').addEventListener('change', (e) => {
+    draft.followUpDate = e.target.value || null; updateFollowupUI();
+  });
   $('capCancel').onclick = () => { renderHome(); show('viewHome'); };
   $('btnSave').onclick = saveConsultation;
 

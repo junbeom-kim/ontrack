@@ -217,6 +217,9 @@ input, textarea, select { font-family: inherit; font-size: 16px; color: inherit;
 .evrow .e-nm { font-size: 14.5px; font-weight: 700; }
 .evrow .e-meta { font-size: 11.5px; color: var(--ink-3); margin-top: 1px; }
 .evrow .e-badge { margin-left: auto; font-size: 10.5px; font-weight: 700; color: var(--accent-deep); }
+.notif-box { background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; padding: 13px 14px; font-size: 13px; color: var(--ink-2); line-height: 1.5; }
+.notif-box .ni { display: block; }
+.notif-box .ni b { color: var(--ink); font-weight: 700; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(var(--safe-bottom) + 90px); transform: translateX(-50%);
