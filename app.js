@@ -205,13 +205,13 @@ function saveConsultation() {
     const c = state.consultations.find(x => x.id === editingId);
     const prevRem = c.reminderId;
     Object.assign(c, base);
-    save(); syncReminder(c, prevRem);
+    save(); syncReminder(c, prevRem); syncAll();
     toast('보강 저장됨'); renderHome(); show('viewHome'); return;
   }
   const c = { id: uid(), createdAt: Date.now(), ...base };
   state.consultations.push(c);
   save();
-  syncReminder(c, null);
+  syncReminder(c, null); syncAll();
   // 확인 화면
   const today = agg(eventCons().filter(x => isToday(x.createdAt)));
   const n = eventCons().filter(x => isToday(x.createdAt)).length;
@@ -238,6 +238,32 @@ async function syncReminder(c, prevReminderId) {
     const id = await Push.schedule({ id: prevReminderId || undefined, title, body, url: './', fireAt });
     c.reminderId = id; save();
   } catch (_) { /* 오프라인 등: 조용히 무시 */ }
+}
+
+// ─────────────────────────── 서버 동기화(코호트) ───────────────────────────
+let _syncing = false;
+async function syncAll() {
+  if (!window.Sync || !Sync.configured() || !state.profile.companyId) { updateSyncBadge(); return; }
+  if (_syncing || !navigator.onLine) { updateSyncBadge(); return; }
+  _syncing = true; updateSyncBadge();
+  try {
+    await Sync.push({
+      companyId: state.profile.companyId,
+      deviceId: window.Push ? Push.deviceId() : null,
+      events: state.events,
+      consultations: state.consultations,
+    });
+    state.profile.lastSyncAt = Date.now(); save();
+  } catch (_) { /* 오프라인/오류: 다음 기회에 재시도 */ }
+  finally { _syncing = false; updateSyncBadge(); }
+}
+function updateSyncBadge() {
+  const b = $('syncBadge'), t = $('syncText'); if (!b) return;
+  const joined = !!state.profile.companyId;
+  if (!joined) { b.classList.add('local'); t.textContent = '로컬 저장'; return; }
+  if (_syncing) { b.classList.remove('local'); t.textContent = '동기화 중…'; return; }
+  if (!navigator.onLine) { b.classList.add('local'); t.textContent = '동기화 대기'; return; }
+  b.classList.remove('local'); t.textContent = '동기화됨';
 }
 
 // ─────────────────────────── 보고서 ───────────────────────────
@@ -327,6 +353,40 @@ async function refreshNotif() {
   }
 }
 
+// 회사 연결(코호트) 박스
+function refreshJoinBox() {
+  const box = $('joinBox'); if (!box) return;
+  if (!window.Sync || !Sync.configured()) { box.innerHTML = '<div class="notif-box">서버 배포 후 사용할 수 있습니다.</div>'; return; }
+  if (state.profile.companyId) {
+    box.innerHTML = `<div class="notif-box"><span class="ni">✅ <b>${esc(state.profile.companyName || state.profile.company)}</b> 에 연결됨. 상담이 코호트 성과에 자동 반영됩니다.</span>
+      <button class="icon-btn" id="jLeave" style="color:var(--hot);font-size:12.5px;padding:8px 0 0;width:100%;text-align:center">연결 해제</button></div>`;
+    $('jLeave').onclick = () => {
+      if (!confirm('회사 연결을 해제할까요? 기록은 이 기기에 그대로 남고, 이후 서버 동기화만 멈춥니다.')) return;
+      state.profile.companyId = null; state.profile.companyName = null; save();
+      refreshJoinBox(); updateSyncBadge(); toast('연결 해제됨');
+    };
+    return;
+  }
+  box.innerHTML = `<input class="input" id="jCode" placeholder="참여 코드 (예: QLQGAY)" autocomplete="off" style="text-transform:uppercase">
+    <button class="btn primary" id="jConnect" style="width:100%;margin-top:8px">연결</button>
+    <div class="opt" id="jMsg" style="margin-top:8px;text-align:center"></div>`;
+  $('jConnect').onclick = async () => {
+    const code = $('jCode').value.trim(); const msg = $('jMsg');
+    if (!code) { msg.style.color = 'var(--hot)'; msg.textContent = '코드를 입력하세요'; return; }
+    msg.style.color = 'var(--ink-3)'; msg.textContent = '연결 중…';
+    try {
+      const r = await Sync.join(code);
+      state.profile.companyId = r.companyId; state.profile.companyName = r.companyName;
+      state.profile.company = r.companyName; save();
+      $('sCompany').value = r.companyName;
+      renderTopbar(); refreshJoinBox(); toast('연결됨'); syncAll();
+    } catch (e) {
+      msg.style.color = 'var(--hot)';
+      msg.textContent = e.status === 404 ? '코드를 확인하세요' : ('오류: ' + e.message);
+    }
+  };
+}
+
 function settingsModal() {
   const evs = state.events.map(e => {
     const meta = [e.country, e.startDate ? fmtDate(e.startDate) : ''].filter(Boolean).join(' · ');
@@ -343,6 +403,9 @@ function settingsModal() {
     <label>출장자</label>
     <input class="input" id="sTraveler" value="${esc(state.profile.traveler)}" placeholder="담당자 이름">
 
+    <label style="margin-top:20px">회사 연결 (코호트)</label>
+    <div id="joinBox"></div>
+
     <label style="margin-top:20px">알림 (재연락 리마인더)</label>
     <div id="notifBox" class="notif-box">확인 중…</div>
 
@@ -356,6 +419,7 @@ function settingsModal() {
     <button class="icon-btn" id="sReset" style="display:block;width:100%;text-align:center;color:var(--hot);margin-top:14px;font-size:13px">전체 데이터 삭제</button>
   `);
   refreshNotif();
+  refreshJoinBox();
   // 관리자 대시보드는 앱에서 분리됨 → 별도 웹(admin.html)에서 운영
   const persistProfile = () => {
     state.profile.company = $('sCompany').value.trim() || '우리 회사';
@@ -479,13 +543,10 @@ function bind() {
   // 모달
   $('modalBg').addEventListener('click', (e) => { if (e.target === $('modalBg')) closeModal(); });
 
-  // 온라인/오프라인 뱃지 (표시용 — 슬라이스1은 로컬 전용)
-  const badge = () => {
-    const b = $('syncBadge'), t = $('syncText');
-    b.classList.toggle('local', !navigator.onLine);
-    t.textContent = navigator.onLine ? '로컬 저장' : '오프라인';
-  };
-  window.addEventListener('online', badge); window.addEventListener('offline', badge); badge();
+  // 동기화 상태 뱃지 + 온라인 복귀 시 동기화
+  window.addEventListener('online', () => { updateSyncBadge(); syncAll(); });
+  window.addEventListener('offline', updateSyncBadge);
+  updateSyncBadge();
 }
 
 // ─────────────────────────── 시작 ───────────────────────────
@@ -493,6 +554,7 @@ load();
 bind();
 renderHome();
 show('viewHome');
+syncAll(); // 조인돼 있으면 시작 시 서버로 밀어넣기
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));

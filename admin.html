@@ -98,6 +98,20 @@
   .gate .msg { font-size:13px; color:var(--hot); min-height:18px; margin-top:10px; }
   .hidden { display:none !important; }
 
+  .tabs { display:flex; gap:4px; margin-bottom:22px; border-bottom:1px solid var(--hairline); }
+  .tab { font-size:14px; font-weight:700; color:var(--ink-3); padding:10px 16px; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tab.active { color:var(--accent-deep); border-bottom-color:var(--accent); }
+  .tab:hover { color:var(--ink); }
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .toolbar .fld { flex:1 1 140px; } .toolbar .fld.wide { flex:2 1 200px; }
+  table.tbl { width:100%; border-collapse:collapse; font-size:13.5px; min-width:600px; }
+  table.tbl th { text-align:left; font-size:11px; font-weight:700; letter-spacing:.03em; color:var(--ink-3); text-transform:uppercase; padding:9px 12px; border-bottom:1.5px solid var(--line); white-space:nowrap; }
+  table.tbl td { padding:11px 12px; border-bottom:1px solid var(--line); }
+  table.tbl tr:last-child td { border-bottom:0; }
+  table.tbl .num { font-variant-numeric:tabular-nums; font-weight:700; text-align:right; }
+  table.tbl .co { font-weight:700; }
+  .codechip { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12.5px; font-weight:700; background:var(--accent-wash); color:var(--accent-deep); padding:3px 8px; border-radius:6px; letter-spacing:.06em; cursor:pointer; }
+  .codechip:hover { filter:brightness(.96); }
   .toast { position:fixed; bottom:26px; left:50%; transform:translateX(-50%); background:var(--ink); color:var(--plane); font-size:13.5px; font-weight:700; padding:12px 20px; border-radius:99px; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:opacity .2s, transform .2s; z-index:20; }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(-4px); }
 </style>
@@ -133,6 +147,40 @@
     </div>
   </header>
 
+  <nav class="tabs">
+    <button class="tab active" data-tab="monitor">성과 모니터링</button>
+    <button class="tab" data-tab="alarm">알림 운영</button>
+  </nav>
+
+  <!-- 성과 모니터링 탭 -->
+  <div id="tabMonitor">
+    <div class="stats">
+      <div class="card stat"><div class="v accent" id="cCos">–</div><div class="k">참가기업 (활동/전체)</div></div>
+      <div class="card stat"><div class="v" id="cEvents">–</div><div class="k">전시회</div></div>
+      <div class="card stat"><div class="v" id="cCons">–</div><div class="k">총 상담</div></div>
+      <div class="card stat"><div class="v" id="cLeads">–</div><div class="k">유효 리드</div></div>
+      <div class="card stat"><div class="v" id="cDeals">–</div><div class="k">계약·MOU 논의</div></div>
+    </div>
+
+    <div class="card panel" style="margin-bottom:18px">
+      <h2>참가기업 등록</h2>
+      <div class="toolbar">
+        <div class="fld wide"><label>회사명</label><input class="f" id="coName" placeholder="예: 에이아이트릭스"></div>
+        <div class="fld"><label>업종(선택)</label><input class="f" id="coIndustry" placeholder="의료AI"></div>
+        <div class="fld"><label>지역(선택)</label><input class="f" id="coRegion" placeholder="서울"></div>
+        <button class="btn primary" id="coCreate" style="padding:11px 18px">등록 · 코드 발급</button>
+      </div>
+      <div class="send-msg" id="coMsg"></div>
+    </div>
+
+    <div class="card panel">
+      <h2>회사별 성과 <span class="cnt" id="coCnt"></span></h2>
+      <div style="overflow-x:auto"><table class="tbl" id="coTable"></table></div>
+    </div>
+  </div>
+
+  <!-- 알림 운영 탭 -->
+  <div id="tabAlarm" class="hidden">
   <div class="stats">
     <div class="card stat"><div class="v accent" id="stSubs">–</div><div class="k">구독 기기</div></div>
     <div class="card stat"><div class="v" id="stPending">–</div><div class="k">예약 대기(재연락)</div></div>
@@ -168,6 +216,7 @@
       </div>
     </div>
   </div>
+  </div><!-- /#tabAlarm -->
 </div>
 
 <div class="toast" id="toast"></div>
@@ -246,7 +295,39 @@ async function load(){
   catch(e){ if(e.status===403){ logout(); } return false; }
 }
 
-function enterApp(){ $('gate').classList.add('hidden'); $('app').classList.remove('hidden'); load(); if(timer)clearInterval(timer); timer=setInterval(load,30000); }
+let activeTab='monitor';
+function switchTab(t){ activeTab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+  $('tabMonitor').classList.toggle('hidden', t!=='monitor');
+  $('tabAlarm').classList.toggle('hidden', t!=='alarm');
+  loadActive();
+}
+function loadActive(){ return activeTab==='monitor' ? loadMonitor() : load(); }
+
+function renderMonitor(m){
+  const c=m.cohort;
+  $('cCos').textContent=`${c.activeCompanies}/${c.companies}`;
+  $('cEvents').textContent=c.events; $('cCons').textContent=c.consultations;
+  $('cLeads').textContent=c.leads; $('cDeals').textContent=c.deals;
+  const rows=m.companies||[]; $('coCnt').textContent=rows.length?`${rows.length}개사`:'';
+  const t=$('coTable');
+  if(!rows.length){ t.innerHTML='<tbody><tr><td style="color:var(--ink-3);padding:18px">등록된 참가기업이 없습니다. 위에서 등록하세요.</td></tr></tbody>'; return; }
+  t.innerHTML='<thead><tr><th>회사</th><th>코드</th><th style="text-align:right">전시회</th><th style="text-align:right">상담</th><th style="text-align:right">유효리드</th><th style="text-align:right">계약논의</th><th>최근활동</th></tr></thead><tbody>'+
+    rows.map(r=>`<tr>
+      <td class="co">${esc(r.name)}${r.industry?`<br><span style="color:var(--ink-3);font-weight:400;font-size:12px">${esc(r.industry)}${r.region?' · '+esc(r.region):''}</span>`:''}</td>
+      <td><span class="codechip" data-code="${esc(r.code)}" title="클릭 복사">${esc(r.code)}</span></td>
+      <td class="num">${r.events}</td><td class="num">${r.consultations}</td><td class="num">${r.leads}</td><td class="num">${r.deals}</td>
+      <td style="color:var(--ink-3);font-size:12.5px">${r.lastActivity?esc(relTime(r.lastActivity)):'–'}</td>
+    </tr>`).join('')+'</tbody>';
+  t.querySelectorAll('.codechip').forEach(el=>el.onclick=()=>{ if(navigator.clipboard) navigator.clipboard.writeText(el.dataset.code); toast('코드 복사됨 · '+el.dataset.code); });
+}
+async function loadMonitor(){
+  const secret=localStorage.getItem(SKEY); if(!secret) return false;
+  try { renderMonitor(await callFn('monitor-stats',{},secret));
+    $('updated').textContent='업데이트 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); return true; }
+  catch(e){ if(e.status===403) logout(); return false; }
+}
+function enterApp(){ $('gate').classList.add('hidden'); $('app').classList.remove('hidden'); loadActive(); if(timer)clearInterval(timer); timer=setInterval(loadActive,30000); }
 function logout(){ localStorage.removeItem(SKEY); if(timer)clearInterval(timer); $('app').classList.add('hidden'); $('gate').classList.remove('hidden'); $('gSecret').value=''; $('gMsg').textContent=''; }
 
 let toastT;
@@ -263,8 +344,22 @@ async function tryEnter(){
 }
 $('gEnter').onclick=tryEnter;
 $('gSecret').addEventListener('keydown',e=>{ if(e.key==='Enter') tryEnter(); });
-$('refresh').onclick=()=>{ load(); };
+$('refresh').onclick=()=>{ loadActive(); };
 $('logout').onclick=logout;
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+$('coCreate').onclick=async()=>{
+  const name=$('coName').value.trim(), industry=$('coIndustry').value.trim(), region=$('coRegion').value.trim();
+  const secret=localStorage.getItem(SKEY); const msg=$('coMsg');
+  if(!name){ msg.style.color='var(--hot)'; msg.textContent='회사명을 입력하세요'; return; }
+  msg.style.color='var(--ink-3)'; msg.textContent='등록 중…'; $('coCreate').disabled=true;
+  try{
+    const r=await callFn('company-create',{name,industry,region},secret);
+    msg.style.color='var(--good-text)';
+    msg.innerHTML=`<b>${esc(r.name)}</b> 등록됨 · 참여 코드 <span class="codechip">${esc(r.code)}</span> — 이 코드를 참가기업에 전달하세요.`;
+    $('coName').value=''; $('coIndustry').value=''; $('coRegion').value=''; loadMonitor();
+  }catch(e){ msg.style.color='var(--hot)'; msg.textContent = e.status===403?'권한 오류(재로그인)':('오류: '+e.message); }
+  finally{ $('coCreate').disabled=false; }
+};
 $('bSend').onclick=async()=>{
   const title=$('bTitle').value.trim(), body=$('bBody').value.trim(), secret=localStorage.getItem(SKEY);
   const msg=$('bMsg');
